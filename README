@@ -43,7 +43,7 @@ id = submit_file(filename)
 id = submit_file(filename,"your_id")
 
 #somewhere else on grid, do:
-filename = recieve_file(id)
+filename = receive_file(id)
 
 #clean up
 destroy(id)
@@ -55,7 +55,7 @@ Use ClusterStorage object, available as:  cluster_storage.cs
 
 cs.is_file('/grid/lsgrid/marc/test.dat')
 cs.delete_file('/grid/lsgrid/marc/test.dat')
-cs.replicate-all('/grid/lsgrid/marc/test.dat')
+cs.replicate_all('/grid/lsgrid/marc/test.dat')
 
 cs.retrieve_file('/grid/lsgrid/marc/test.dat','local_name.dat')
 cs.store_file('local_name.dat','/grid/lsgrid/marc/test.dat')
