@@ -1,7 +1,7 @@
 PREREQUISITES
 =============
 - add LFC_HOME to your environment,
-   (not necessary if low-level interface is used)
+   (not necessary if only low-level interface and/or executables are used)
 
    e.g. add to your script something like:
    export LFC_HOME='/grid/lsgrid/marc/'
@@ -68,3 +68,17 @@ cs.list_dir('/grid/lsgrid/marc')
 #list of storage servers
 cs.get_other_storage_engines()
 
+
+Executables
+-----------
+copy all files to bin directory, then:
+
+#copy
+cp_fromgrid /grid/lsgrid/marc/test.dat local_name.dat
+cp_togrid local_name.dat /grid/lsgrid/marc/test.dat
+
+#replicate
+rep_ongrid /grid/lsgrid/marc/test.dat
+
+#delete
+del_fromgrid /grid/lsgrid/marc/test.dat
