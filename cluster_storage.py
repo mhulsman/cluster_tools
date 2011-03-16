@@ -7,7 +7,17 @@ import filecmp
 
 
 
+
+def create_unique_id():
+    """Create unique file id"""
+    id = None
+    while(not check_id(id)):
+        x = random.randint(0,100000000)
+        id = "object" + str(x) 
+    return id
+
 def check_id(id):
+    """Check if id is in use"""
     if(not id):
         return False
     filename = id + ".dat"
@@ -15,14 +25,12 @@ def check_id(id):
         return False
     return not cs.is_file(os.environ['LFC_HOME'] + "/" + filename)
 
-def create_unique_id():
-    id = None
-    while(not check_id(id)):
-        x = random.randint(0,100000000)
-        id = "object" + str(x) 
-    return id
-
 def submit(object,id=None,noreplace=False):
+    """Submit object to grid. Returns id.
+       
+       @param id: Give a fixed id. 
+       @param noreplace: if fixed id given, an file exists, return just id [default=False]
+    """
     if(not id):
         id = create_unique_id()
     filename = id + ".dat"
@@ -48,6 +56,7 @@ def submit(object,id=None,noreplace=False):
     return id
 
 def submit_file(source_filename,id=None,noreplace=False):
+    """As `submit`, but for files"""
     if(not id):
         id = create_unique_id()
     
@@ -66,6 +75,7 @@ def submit_file(source_filename,id=None,noreplace=False):
     return id
 
 def receive(id):
+    """Receive object stored as `id`."""
     filename = id + ".dat"
     retry = 3
     while(retry):
@@ -93,6 +103,7 @@ def receive(id):
     return object
 
 def receive_file(id):
+    """Retrieves file. Returns filename"""
     filename = id + ".dat"
     if(not os.path.isfile(filename)):
         network_path = os.environ['LFC_HOME'] + '/' + filename
@@ -100,6 +111,7 @@ def receive_file(id):
     return filename
 
 def destroy(id, check_grid_exist=True):
+    """Destroys file with `id` on grid"""
     try:
         filename = id + ".dat"
         if(os.path.isfile(filename)):
@@ -111,6 +123,9 @@ def destroy(id, check_grid_exist=True):
         print "FAIL DESTROY of" + id
 
 def destroy_all(only_unknown=False):
+    """Destroy all files ending with .dat in the grid directory.
+    @param only_unknown: destroy only those with auto-generated id
+    (i.e. starting name wih object) [default: False]"""
     files = cs.list_dir(os.environ['LFC_HOME'])
 
     files =  [file[:-4] for file in files if file.endswith('.dat')]

@@ -1,0 +1,70 @@
+PREREQUISITES
+=============
+- add LFC_HOME to your environment,
+   (not necessary if low-level interface is used)
+
+   e.g. add to your script something like:
+   export LFC_HOME='/grid/lsgrid/marc/'
+   This directory will be used to store the data.
+
+- startGridSession lsgrid
+
+CLUSTER STORAGE
+===============
+Cluster storage performs all operations robustly
+- it automatically retries on failure (with waiting periods)
+- it replicates accross grid
+
+
+Python objects
+--------------
+For sending large python objects, make use of submit / receive functions in cluster_storage.py:
+
+#somewhere on grid, do:
+id = submit(your_object)
+#or, with fixed id:
+id = submit(your_object,"your_id")
+
+#somewhere else on grid, do:
+object = receive(id)    
+
+#clean up
+destroy(id)
+
+
+Files 
+-----
+Same as python objects, but use filenames:
+
+#somewhere on grid, do:
+id = submit_file(filename)
+
+#or, with fixed id:
+id = submit_file(filename,"your_id")
+
+#somewhere else on grid, do:
+filename = recieve_file(id)
+
+#clean up
+destroy(id)
+
+
+Low-level
+---------
+Use ClusterStorage object, available as:  cluster_storage.cs
+
+cs.is_file('/grid/lsgrid/marc/test.dat')
+cs.delete_file('/grid/lsgrid/marc/test.dat')
+cs.replicate-all('/grid/lsgrid/marc/test.dat')
+
+cs.retrieve_file('/grid/lsgrid/marc/test.dat','local_name.dat')
+cs.store_file('local_name.dat','/grid/lsgrid/marc/test.dat')
+
+#do not redownload file to check if store really succeeded:
+cs.store_file('local_name.dat','/grid/lsgrid/marc/test.dat', check_equal=False)
+
+cs.list_dir('/grid/lsgrid/marc')
+
+#list of storage servers
+cs.get_other_storage_engines()
+
