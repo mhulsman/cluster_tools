@@ -71,7 +71,7 @@ cs.get_other_storage_engines()
 
 Executables
 -----------
-copy all files to bin directory, then:
+copy all files to bin directory, make them executable if necessary (use chmod), then:
 
 #copy
 cp_fromgrid /grid/lsgrid/marc/test.dat local_name.dat
