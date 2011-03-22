@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+import cluster_storage
+import sys
+import os
+
+source = sys.argv[1]
+destination = sys.argv[2]
+
+cs = cluster_storage.ClusterStorageEngine()
+
+if source.startswith('grid:/'):
+    source = source[6:]
+    if not source.startswith('/'):
+        source = os.path.join(os.environ['LFC_HOME'], source)        
+    cs.retrieve_file(source,destination)
+elif destination.startswith('grid:/'):
+    destination = destination[6:]
+    if not destination.startswith('/'):
+        destination = os.path.join(os.environ['LFC_HOME'], destination)        
+    cs.retrieve_file(source,destination)
+elif source.startswith('/grid/'):
+    cs.retrieve_file(source,destination)
+elif destination.startswith('/grid/'):
+    cs.store_file(source,destination)
+else:
+    print "Grid path should start with grid:/"
+

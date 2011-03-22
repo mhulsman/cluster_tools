@@ -14,6 +14,7 @@ CLUSTER STORAGE
 Cluster storage performs all operations robustly
 - it automatically retries on failure (with waiting periods)
 - it replicates accross grid
+- it uses hashing to check identity
 
 
 Python objects
@@ -51,7 +52,7 @@ destroy(id)
 
 Low-level
 ---------
-Use ClusterStorage object, available as:  cluster_storage.cs
+Use ClusterStorageEngine object, available as:  cluster_storage.cs
 
 cs.is_file('/grid/lsgrid/marc/test.dat')
 cs.delete_file('/grid/lsgrid/marc/test.dat')
@@ -73,12 +74,35 @@ Executables
 -----------
 copy all files to bin directory, make them executable if necessary (use chmod), then:
 
-#copy
-cp_fromgrid /grid/lsgrid/marc/test.dat local_name.dat
-cp_togrid local_name.dat /grid/lsgrid/marc/test.dat
+#copy 
+gcp /grid/lsgrid/marc/test.dat local_name.dat
+gcp local_name.dat /grid/lsgrid/marc/test.dat
 
 #replicate
-rep_ongrid /grid/lsgrid/marc/test.dat
+greplicate /grid/lsgrid/marc/test.dat
 
 #delete
-del_fromgrid /grid/lsgrid/marc/test.dat
+grm /grid/lsgrid/marc/test.dat
+
+#directories
+gmkdir /grid/lsgrid/marc/test
+grmdir /grid/lsgrid/marc/test
+
+
+#Note 1:
+Note that you can prepend grid paths with grid:/
+This can be usefull with a command as gcp, to distinguish local and grid paths
+(Otherwise, paths starting with /grid/ are assumed to be on the grid)
+E.g: 
+
+gcp grid://grid/lsgrid/marc/test.dat local_name.dat
+
+#Note 2:
+If grid path does not start with / symbol, the command will use variable LFC_HOME as 
+starting point
+
+#create a dir test under the home dir:
+gmkdir test
+
+#copy a file to it
+gcp local_name.dat grid:/test/test.dat

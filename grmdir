@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+import cluster_storage
+import sys
+import os
+
+path = sys.argv[1]
+
+if path.startswith('grid:/'):
+    path = path[6:]
+if not path.startswith('/'):
+    path = os.path.join(os.environ['LFC_HOME'], path)        
+
+cs = cluster_storage.ClusterStorageEngine()
+cs.rmdir(path)
+

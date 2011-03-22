@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+import cluster_storage
+import sys
+import os
+
+source = sys.argv[1]
+
+if source.startswith('grid:/'):
+    source = source[6:]
+if not source.startswith('/'):
+    source = os.path.join(os.environ['LFC_HOME'], source)        
+
+cs = cluster_storage.ClusterStorageEngine()
+cs.replicate_all(source)
+

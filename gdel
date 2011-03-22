@@ -1,9 +1,0 @@
-#!/usr/bin/env python
-import cluster_storage
-import sys
-
-source = sys.argv[1]
-
-cs = cluster_storage.ClusterStorageEngine()
-cs.delete_file(source)
-
