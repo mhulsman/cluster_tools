@@ -4,7 +4,7 @@ import os
 import random
 import cPickle, zlib
 import filecmp
-import hashlib
+import sha
 
 class HighLevelStorage(object):
     def __init__(self, path, engines=[]):
@@ -68,7 +68,7 @@ class HighLevelStorage(object):
         return id
 
     def hash_file(self, filename):
-        hash = hashlib.sha1()
+        hash = sha.new()
         f = open(filename, 'r+b')
         x = f.read(4096)
         while x:
@@ -219,6 +219,7 @@ def _robust_process(command,times=3,noerror=None, **kwargs):
             if(retry == 0):
                 raise e
             else:
+                print "RETRY: " + str(e)
                 time.sleep((times - retry) * 30)
     return out
     
@@ -251,7 +252,10 @@ class StoragePath(object):
         return self.engine.list_dir(self.newpath(cpath))
 
     def mkdir(self, cpath):
-        return self.engine.list_dir(self.newpath(filename))
+        return self.engine.mkdir(self.newpath(filename))
+    
+    def rmdir(self, cpath):
+        return self.engine.rmdir(self.newpath(filename))
 
     def store_file(self,filepath,cpath,check_equal=True):
         return self.engine.store_file(filepath, self.newpath(cpath))
@@ -271,6 +275,9 @@ class LocalStorageEngine(object):
 
     def mkdir(self, cpath):
         os.mkdir(cpath)
+    
+    def rmdir(self, cpath):
+        os.rmdir(cpath)
 
     def store_file(self,filepath,cpath,check_equal=True):
         if filepath != cpath:
@@ -317,7 +324,12 @@ class ClusterStorageEngine(object):
         return files[:-1]
 
     def mkdir(self,cpath):
-        pass
+        cmd = "lfc-mkdir " + cpath
+        _robust_process(cmd)
+    
+    def rmdir(self, cpath):
+        cmd = "lfc-rm -r " + cpath
+        _robust_process(cmd)
 
     def store_file(self,filepath,cpath,check_equal=True):
         filepath = os.path.abspath(filepath)

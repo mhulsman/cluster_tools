@@ -4,6 +4,6 @@ import sys
 
 source = sys.argv[1]
 
-cs = cluster_storage.ClusterStorage()
+cs = cluster_storage.ClusterStorageEngine()
 cs.replicate_all(source)
 

@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+import cluster_storage
+import sys
+
+dir = sys.argv[1]
+
+cs = cluster_storage.ClusterStorageEngine()
+l =  cs.list_dir(dir)
+for e in l:
+    print e
+
