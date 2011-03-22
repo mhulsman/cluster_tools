@@ -1,141 +1,205 @@
-import subprocess, sys, getopt, time,shlex
+import subprocess, sys, getopt, time,shlex,shutil
 from subprocess import Popen
 import os
 import random
 import cPickle, zlib
 import filecmp
+import hashlib
 
+class HighLevelStorage(object):
+    def __init__(self, path, engines=[]):
+        self.path = path
+        self.engines = engines
 
+    def filename(self, id):
+        r = str(id).split("_HASH_")[0]
+        return r + ".dat"
+    
+    def attach_hash(self, id, hash):
+        return str(id) + "_HASH_" + str(hash)
 
+    def hash(self, id):
+        r = str(id).split("_HASH_")
+        if len(r) > 1:
+            return r[-1]
+        else:
+            return None
 
-def create_unique_id():
-    """Create unique file id"""
-    id = None
-    while(not check_id(id)):
-        x = random.randint(0,100000000)
-        id = "object" + str(x) 
-    return id
-
-def check_id(id):
-    """Check if id is in use"""
-    if(not id):
-        return False
-    filename = id + ".dat"
-    if(os.path.isfile(filename)):
-        return False
-    return not cs.is_file(os.environ['LFC_HOME'] + "/" + filename)
-
-def submit(object,id=None,noreplace=False):
-    """Submit object to grid. Returns id.
+    def tmp_filename(self):
+        x = random.randint(0,1000000000000)
+        id = "tmp" + str(x) 
+        while(os.path.isfile(self.filename(id))):
+            x = random.randint(0,1000000000000)
+            id = "tmp" + str(x) 
+        return self.filename(id)
        
-       @param id: Give a fixed id. 
-       @param noreplace: if fixed id given, an file exists, return just id [default=False]
-    """
-    if(not id):
-        id = create_unique_id()
-    filename = id + ".dat"
-    network_path = os.environ['LFC_HOME'] + '/' + filename
+    def create_unique_id(self):
+        """Create unique file id"""
+        id = None
+        while(self.exists(id)):
+            x = random.randint(0,1000000000000)
+            id = "object" + str(x) 
+        return id
 
-    if(noreplace):
-        if(os.path.isfile(filename) and cs.is_file(network_path)):
-            return id
-
-    data = zlib.compress(cPickle.dumps(object,protocol=2))
-    if(os.path.isfile(filename)):
-        os.remove(filename)
-
-    f = open(filename,'w')
-    f.write(data)
-    f.close()
+    def exists(self, id):
+        """Check if id is in use"""
+        if id is None:
+            return True
+        filename = self.filename(id)
+        return any([engine.is_file(filename) for engine in self.engines])
     
-    cs.store_file(filename,network_path)
-    try:
-        cs.replicate_all(network_path)
-    except Exception, e:
-        pass
-    return id
-
-def submit_file(source_filename,id=None,noreplace=False):
-    """As `submit`, but for files"""
-    if(not id):
-        id = create_unique_id()
-    
-    filename = id + ".dat"
-    network_path = os.environ['LFC_HOME'] + '/' + filename
-
-    if(noreplace):
-        if(cs.is_file(network_path)):
-            return id
-
-    cs.store_file(source_filename,network_path)
-    try:
-        cs.replicate_all(network_path)
-    except Exception, e:
-        pass
-    return id
-
-def receive(id):
-    """Receive object stored as `id`."""
-    filename = id + ".dat"
-    retry = 3
-    while(retry):
-        try:
-            if(not os.path.isfile(filename)):
-                network_path = os.environ['LFC_HOME'] + '/' + filename
-                cs.retrieve_file(network_path,filename)
-            
-            f = open(filename,'r')
-            data = f.read()
-            f.close()
-            object = cPickle.loads(zlib.decompress(data))
-            retry = 0
-        except Exception,e:
-            retry -= 1
-            if(os.path.isfile(filename)):
-                os.remove(filename)
-            if(retry == 0):
-                print "FAIL RECEIVE"
-                raise RuntimeError, str(e) + " on id " + id
-            else:
-                print "RETRY RECEIVE"
-            time.sleep(30)
-
-    return object
-
-def receive_file(id):
-    """Retrieves file. Returns filename"""
-    filename = id + ".dat"
-    if(not os.path.isfile(filename)):
-        network_path = os.environ['LFC_HOME'] + '/' + filename
-        cs.retrieve_file(network_path,filename)
-    return filename
-
-def destroy(id, check_grid_exist=True):
-    """Destroys file with `id` on grid"""
-    try:
-        filename = id + ".dat"
-        if(os.path.isfile(filename)):
-            os.remove(filename)
-        network_path = os.environ['LFC_HOME'] + '/' + filename
-        if(not check_grid_exist or cs.is_file(network_path)):
-            cs.delete_file(filename)
-    except Exception, e:
-        print "FAIL DESTROY of" + id
-
-def destroy_all(only_unknown=False):
-    """Destroy all files ending with .dat in the grid directory.
-    @param only_unknown: destroy only those with auto-generated id
-    (i.e. starting name wih object) [default: False]"""
-    files = cs.list_dir(os.environ['LFC_HOME'])
-
-    files =  [file[:-4] for file in files if file.endswith('.dat')]
-    if(only_unknown):
-        files =  [file for file in files if file.startswith('object')]
+    def submit(self, object,id=None,noreplace=False):
+        """Submit object to grid. Returns id.
         
-    
-    for pos,file in enumerate(files):
-        print str(pos) + "/" + str(len(files)) + ": " + file
-        destroy(file)
+        @param id: Give a fixed id. 
+        @param noreplace: if fixed id given, an file exists, return just id [default=False]
+        """
+        data = zlib.compress(cPickle.dumps(object,protocol=2))
+
+        local_filename = self.tmp_filename()
+        f = open(local_filename,'w')
+        f.write(data)
+        f.close()
+        
+        try:
+            id = self.submit_file(local_filename, id, noreplace)
+        finally: 
+            os.remove(local_filename)
+        return id
+
+    def hash_file(self, filename):
+        hash = hashlib.sha1()
+        f = open(filename, 'r+b')
+        x = f.read(4096)
+        while x:
+            hash.update(x)
+            x = f.read(4096)
+        return hash.hexdigest()
+
+    def submit_file(self, source_filename,id=None,noreplace=False):
+        """As `submit`, but for files"""
+
+        hash = self.hash_file(source_filename)
+
+        if(not id):
+            id = create_unique_id()
+
+        filename = self.filename(id)
+        
+        
+        for engine in self.engines:
+            if noreplace and engine.is_file(filename):
+                continue
+            engine.store_file(source_filename, filename)
+            try:
+                engine.replicate_all(filename)
+            except Exception, e:
+                pass
+       
+        id = self.attach_hash(id,hash)
+        return id
+
+    def receive(self, id):
+        """Receive object stored as `id`."""
+        retry = 3
+        filename = None
+        while(retry):
+            try:
+                filename = self.receive_file(id)
+                f = open(filename,'r')
+                data = f.read()
+                f.close()
+                object = cPickle.loads(zlib.decompress(data))
+                retry = 0
+            except Exception,e:
+                if filename is None or self.hash(id): #receive_file failed, or problem with unpickling. no point in retrying
+                    raise e
+                #receive file did get data, but it might be corrupted. Lets retry
+                if os.path.isfile(filename):
+                    os.remove(filename)
+                retry -= 1
+                if(retry == 0):
+                    raise RuntimeError, str(e) + " for file " + self.filename(id)
+                else:
+                    print "Retry receive for file " + str(id)
+
+        return object
+
+    def receive_file(self, id):
+        """Retrieves file. Returns filename"""
+        filename = self.filename(id)
+        local_filename = os.path.join(self.path, filename)
+
+        if os.path.isfile(local_filename):
+            if self.hash(id) and not self.hash(id) == self.hash_file(local_filename):
+                os.remove(local_filename) #maybe an old version? Lets try to reload before complaining.
+            else:                
+                return local_filename
+       
+        last_error = None
+        tmpfile = self.tmp_filename()
+        retry = 3
+        while retry:
+            for engine in self.engines:
+                if not engine.is_file(filename):
+                    continue
+                try:                
+                    engine.retrieve_file(filename, tmpfile)
+                    break
+                except Exception, e:
+                    print "File " + self.filename(id) + " could not be retrieved by " + str(engine) + ". Falling back to next engine."
+                    last_error = e
+            else:
+                if last_error is None:
+                    raise RuntimeError, "File " + self.filename(id) + " not found by any storage engines"
+                else:
+                    raise e
+
+            if self.hash(id):
+                if self.hash(id) == self.hash_file(tmpfile):
+                    retry = 0
+                else:
+                    retry -= 1
+                    os.remove(tmpfile)
+                    if retry == 0:
+                        raise RuntimeError, "File " + self.filename(id) + " retrieved with wrong hash"
+                    else:                        
+                        print "Retry receive for file " + str(id)
+            else:
+                retry = 0
+        try:
+            os.rename(tmpfile, local_filename)
+        except OSError:
+            pass
+        return local_filename
+
+    def destroy(self, id):
+        """Destroys file with `id` on grid"""
+        filename = self.filename(id)
+        for engine in self.engines:
+            try:
+                engine.delete_file(filename)
+            except Exception, e:
+                print "Failed removal of " + self.filename(id) + " by " + str(engine)
+
+
+    def destroy_all(self, only_unknown=True):
+        """Destroy all files ending with .dat that are in path.
+        @param only_unknown: destroy only those with auto-generated id
+        (i.e. starting name wih object) [default: False]"""
+        
+        files = set()
+        for engine in self.engines:
+            files.update(engine.list_dir())
+
+        files =  [file[:-4] for file in files if file.endswith('.dat')]
+
+        if(only_unknown):
+            files =  [file for file in files if file.startswith('object')]
+        
+        for pos,file in enumerate(files):
+            print str(pos) + "/" + str(len(files)) + ": " + file
+            self.destroy(file)
 
 
 def _robust_process(command,times=3,noerror=None, **kwargs):
@@ -155,7 +219,7 @@ def _robust_process(command,times=3,noerror=None, **kwargs):
             if(retry == 0):
                 raise e
             else:
-                time.sleep(30)
+                time.sleep((times - retry) * 30)
     return out
     
 def _robust_func(func,times=3, *args, **kwargs):
@@ -169,10 +233,64 @@ def _robust_func(func,times=3, *args, **kwargs):
             if(retry == 0):
                 raise e
             else:
-                time.sleep(30)
+                time.sleep((times - retry) * 30)
     return res
 
-class ClusterStorage(object):
+class StoragePath(object):
+    def __init__(self, engine, path=None):
+        self.engine = engine
+        self.path = os.path.expanduser(path)
+
+    def newpath(self, filename):
+        return os.path.abspath(os.path.join(self.path, filename))
+
+    def is_file(self, filename):
+        return self.engine.is_file(self.newpath(filename))
+
+    def list_dir(self, cpath=""):
+        return self.engine.list_dir(self.newpath(cpath))
+
+    def mkdir(self, cpath):
+        return self.engine.list_dir(self.newpath(filename))
+
+    def store_file(self,filepath,cpath,check_equal=True):
+        return self.engine.store_file(filepath, self.newpath(cpath))
+
+    def retrieve_file(self,cpath,filepath):
+        return self.engine.retrieve_file(self.newpath(cpath), filepath)
+     
+    def replicate_all(self,cpath):
+        return self.engine.replicate_all(self.newpath(cpath))
+
+    def delete_file(self, filename):
+        return self.engine.delete_file(self.newpath(filename))
+
+class LocalStorageEngine(object):
+    def list_dir(self, cpath):
+        return os.listdir(cpath)
+
+    def mkdir(self, cpath):
+        os.mkdir(cpath)
+
+    def store_file(self,filepath,cpath,check_equal=True):
+        if filepath != cpath:
+            shutil.copyfile(filepath, cpath)
+
+    def retrieve_file(self,cpath,filepath):
+        if filepath != cpath:
+            shutil.copyfile(cpath, filepath)
+     
+    def replicate_all(self,cpath):
+        pass
+
+    def is_file(self,cpath):
+        return os.path.isfile(cpath)
+
+    def delete_file(self, filename):
+        os.remove(filename)
+
+
+class ClusterStorageEngine(object):
     def __init__(self):
         self.storage_engine = os.environ['VO_LSGRID_DEFAULT_SE']
 
@@ -239,7 +357,7 @@ class ClusterStorage(object):
                 if(retry == 0):
                     raise e
                 else:
-                    time.sleep(30)
+                    time.sleep((3-retry) * 30)
 
     def retrieve_file(self,cpath,filepath):
         gpath,gname = os.path.split(cpath)
@@ -299,7 +417,8 @@ class ClusterStorage(object):
             if(ncommands):
                 retry -= 1
                 commands = ncommands
-                time.sleep(30)
+                if retry > 0:
+                    time.sleep((3 - retry) * 30)
             else:
                 retry = 0
         
@@ -318,4 +437,24 @@ class ClusterStorage(object):
         command = 'lcg-del -a "lfn:' + gridname + '"'
         _robust_process(command)
 
-cs = ClusterStorage()
+if 'VO_LSGRID_DEFAULT_SE' in os.environ:
+    cs = ClusterStorageEngine()
+    
+ls = LocalStorageEngine()
+lsp = StoragePath(ls, os.getcwd())
+
+if 'LFC_HOME' in os.environ and 'VO_LSGRID_DEFAULT_SE' in os.environ:
+    csp = StoragePath(cs, os.environ['LFC_HOME'])
+    hs = HighLevelStorage(os.getcwd(), [csp, lsp])
+else:
+    hs = HighLevelStorage(os.getcwd(), [lsp])
+   
+create_unique_id = hs.create_unique_id
+exists = hs.exists
+submit = hs.submit
+submit_file = hs.submit_file
+receive = hs.receive
+receive_file = hs.receive_file
+destroy = hs.destroy
+destroy_all = hs.destroy_all
+
