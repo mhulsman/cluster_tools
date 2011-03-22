@@ -90,16 +90,15 @@ grmdir /grid/lsgrid/marc/test
 
 
 #Note 1:
-Note that you can prepend grid paths with grid:/
-This can be usefull with a command as gcp, to distinguish local and grid paths
-(Otherwise, paths starting with /grid/ are assumed to be on the grid)
-E.g: 
+Grid paths can be indicated by prepending with grid:/
+This can be useful with a command such as gcp, to distinguish local and grid paths
+(Otherwise, paths starting with /grid/ are assumed to be on the grid). E.g: 
 
 gcp grid://grid/lsgrid/marc/test.dat local_name.dat
 
 #Note 2:
-If grid path does not start with / symbol, the command will use variable LFC_HOME as 
-starting point
+If a grid path does not start with the / symbol, the command will prepend it with 
+the contents of LFC_HOME (i.e. your 'home' directory on the grid storage)
 
 #create a dir test under the home dir:
 gmkdir test
