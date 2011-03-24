@@ -17,7 +17,7 @@ elif destination.startswith('grid:/'):
     destination = destination[6:]
     if not destination.startswith('/'):
         destination = os.path.join(os.environ['LFC_HOME'], destination)        
-    cs.retrieve_file(source,destination)
+    cs.store_file(source,destination)
 elif source.startswith('/grid/'):
     cs.retrieve_file(source,destination)
 elif destination.startswith('/grid/'):
