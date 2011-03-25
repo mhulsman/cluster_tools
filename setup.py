@@ -13,7 +13,7 @@ setup(name = 'ClusterStorageLib',
     url ='',
     packages = [],
     provides=['cluster_storage'],
-    scripts = ['gcp','gls','gmkdir','grmdir','greplicate','grm','cluster_storage.py']
+    scripts = ['gcp','gls','gmkdir','grmdir','greplicate','grm']
 )
 
 

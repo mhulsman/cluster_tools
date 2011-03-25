@@ -4,7 +4,6 @@ import os
 import random
 import cPickle, zlib
 import filecmp
-import sha
 
 class HighLevelStorage(object):
     def __init__(self, path, engines=[]):
@@ -68,7 +67,12 @@ class HighLevelStorage(object):
         return id
 
     def hash_file(self, filename):
-        hash = sha.new()
+        try:
+            import hashlib
+            hash = hashlib.sha1()
+        except ImportError:
+            import sha
+            hash = sha.new()
         f = open(filename, 'r+b')
         x = f.read(4096)
         while x:
