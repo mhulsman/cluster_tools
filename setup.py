@@ -11,7 +11,7 @@ setup(name = 'ClusterStorageLib',
     author = 'Marc Hulsman',
     author_email = 'm.hulsman@tudelft.nl',
     url ='',
-    packages = [],
+    py_modules = ['cluster_storage'],
     provides=['cluster_storage'],
     scripts = ['gcp','gls','gmkdir','grmdir','greplicate','grm']
 )
