@@ -4,6 +4,7 @@ import os
 import random
 import cPickle, zlib
 import filecmp
+import logging
 
 class HighLevelStorage(object):
     def __init__(self, path, engines=[]):
@@ -117,15 +118,16 @@ class HighLevelStorage(object):
                 retry = 0
             except Exception,e:
                 if filename is None or self.hash(id): #receive_file failed, or problem with unpickling. no point in retrying
-                    raise e
+                    import traceback
+                    raise RuntimeError, str(e) + " for file " + self.filename(id) + " with id " + str(id) + '\n' + str(traceback.format_exc())
                 #receive file did get data, but it might be corrupted. Lets retry
                 if os.path.isfile(filename):
                     os.remove(filename)
                 retry -= 1
                 if(retry == 0):
-                    raise RuntimeError, str(e) + " for file " + self.filename(id)
+                    raise RuntimeError, str(e) + " for file " + self.filename(id) + " with id " + str(id)
                 else:
-                    print "Retry receive for file " + str(id)
+                    logging.warning("Retry receive for file " + str(id))
 
         return object
 
@@ -151,7 +153,7 @@ class HighLevelStorage(object):
                     engine.retrieve_file(filename, tmpfile)
                     break
                 except Exception, e:
-                    print "File " + self.filename(id) + " could not be retrieved by " + str(engine) + ". Falling back to next engine."
+                    logging.warning("File " + self.filename(id) + " could not be retrieved by " + str(engine) + ". Falling back to next engine.")
                     last_error = e
             else:
                 if last_error is None:
@@ -168,7 +170,7 @@ class HighLevelStorage(object):
                     if retry == 0:
                         raise RuntimeError, "File " + self.filename(id) + " retrieved with wrong hash"
                     else:                        
-                        print "Retry receive for file " + str(id)
+                        logging.warning("Retry receive for file " + str(id))
             else:
                 retry = 0
         try:
@@ -184,7 +186,7 @@ class HighLevelStorage(object):
             try:
                 engine.delete_file(filename)
             except Exception, e:
-                print "Failed removal of " + self.filename(id) + " by " + str(engine)
+                logging.warning("Failed removal of " + self.filename(id) + " by " + str(engine) + " due to " + str(e))
 
 
     def destroy_all(self, only_unknown=True):
@@ -202,7 +204,7 @@ class HighLevelStorage(object):
             files =  [file for file in files if file.startswith('object')]
         
         for pos,file in enumerate(files):
-            print str(pos) + "/" + str(len(files)) + ": " + file
+            logging.info("Removing: " + str(pos) + "/" + str(len(files)) + ": " + file)
             self.destroy(file)
 
 
@@ -223,7 +225,7 @@ def _robust_process(command,times=3,noerror=None, **kwargs):
             if(retry == 0):
                 raise e
             else:
-                print "RETRY: " + str(e)
+                logging.warning("RETRY: " + str(e))
                 time.sleep((times - retry) * 30)
     return out
     
@@ -256,10 +258,10 @@ class StoragePath(object):
         return self.engine.list_dir(self.newpath(cpath))
 
     def mkdir(self, cpath):
-        return self.engine.mkdir(self.newpath(filename))
+        return self.engine.mkdir(self.newpath(cpath))
     
     def rmdir(self, cpath):
-        return self.engine.rmdir(self.newpath(filename))
+        return self.engine.rmdir(self.newpath(cpath))
 
     def store_file(self,filepath,cpath,check_equal=True):
         return self.engine.store_file(filepath, self.newpath(cpath))
@@ -429,6 +431,7 @@ class ClusterStorageEngine(object):
                 r = process.wait()
                 if(r):
                     ncommands.append(command)
+                    logging.warning("Replication failed for: " + str(command))
             
             if(ncommands):
                 retry -= 1
@@ -452,6 +455,26 @@ class ClusterStorageEngine(object):
     def delete_file(self,gridname):
         command = 'lcg-del -a "lfn:' + gridname + '"'
         _robust_process(command)
+
+def create_highlevel(local_path, engine_params):
+    storage_engines = []
+    for key, val in engine_params.iteritems():
+        if key == "cluster":
+            e = ClusterStorageEngine()
+        elif key == "local":
+            e = LocalStorageEngine()
+        else:
+            raise RuntimeError, "Unknown engine key: " + str(key)
+
+        if val == "*":
+            if key == "cluster":
+                e = StoragePath(e, os.environ['LFC_HOME'])
+            elif key == "local":
+                e = StoragePath(e, local_path)
+        elif val:
+            e = StoragePath(e, val)
+        storage_engines.append(e)
+    return HighLevelStorage(local_path, storage_engines)
 
 if 'VO_LSGRID_DEFAULT_SE' in os.environ:
     cs = ClusterStorageEngine()
