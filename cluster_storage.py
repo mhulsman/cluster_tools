@@ -5,6 +5,7 @@ import random
 import cPickle, zlib
 import filecmp
 import logging
+import time
 
 class HighLevelStorage(object):
     def __init__(self, path, engines=[]):
@@ -418,6 +419,7 @@ class ClusterStorageEngine(object):
         for engine in self.other_engines:
             command = 'lcg-rep --vo lsgrid -d ' + engine + ' "lfn:' + cpath + '"'
             commands.append(command)
+        
 
         retry = 3
         while(retry):
@@ -426,12 +428,29 @@ class ClusterStorageEngine(object):
             for command in commands:
                 args = shlex.split(command)
                 processes.append((Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE),command))
-        
+            start = time.time()
+            if retry == 3:
+                times = []
+                while len(processes) > (len(commands) / 2.0):
+                    for pos,(process, command) in enumerate(list(processes)):
+                        if process.poll() is None:
+                            time.sleep(0.1)
+                        else:
+                            times.append(time.time() - start)
+                            del processes[processes.index((process,command))]
+                avgtime = float(sum(times)) / float(len(times))
+            logging.info("Average replication time first half: " + str(avgtime) )
             for process,command in processes:
-                r = process.wait()
-                if(r):
-                    ncommands.append(command)
-                    logging.warning("Replication failed for: " + str(command))
+                while process.poll() is None:
+                    time.sleep(0.1)
+                    if time.time() > start + avgtime * 5:
+                        logging.warning("Replication timed out for: " + str(command))
+                        process.terminate()
+                        break
+                else:
+                    if process.returncode != 0:
+                        ncommands.append(command)
+                        logging.warning("Replication failed for: " + str(command))
             
             if(ncommands):
                 retry -= 1
