@@ -209,17 +209,23 @@ class HighLevelStorage(object):
             self.destroy(file)
 
 
-def _robust_process(command,times=3,noerror=None, **kwargs):
+def _robust_process(command,times=3,noerror=None, ignore=['no version information available'], **kwargs):
     retry=times
     args = shlex.split(command)
     while(retry):
         try:
             out,err = Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,**kwargs).communicate()
-            if(err):
+            if (err) :
                 if(noerror and noerror in err):
                     return False
                 else:
-                    raise RuntimeError, err
+		    have_ignore = False
+		    for ig in ignore :
+		    	if ig in err :
+				have_ignore = True
+				break
+                    if not have_ignore :
+		    	raise RuntimeError, err
             retry = 0
         except Exception,e:
             retry-=1
@@ -313,7 +319,7 @@ class ClusterStorageEngine(object):
             command1 = "lcg-infosites --vo lsgrid se"
             command2 = "grep -Po '\\b\\S+$'"
             command3 = "grep '\\.'"
-            p1 = Popen(shlex.split(command1),stdout=subprocess.PIPE)
+	    p1 = Popen(shlex.split(command1),stdout=subprocess.PIPE)
             p2 = Popen(shlex.split(command2),stdout=subprocess.PIPE,stdin=p1.stdout)
             storage_engines = _robust_process(command3,stdin=p2.stdout,times=1)
             storage_engines = set(storage_engines.split('\n'))
@@ -420,7 +426,6 @@ class ClusterStorageEngine(object):
             command = 'lcg-rep --vo lsgrid -d ' + engine + ' "lfn:' + cpath + '"'
             commands.append(command)
         
-
         retry = 3
         while(retry):
             ncommands = []
